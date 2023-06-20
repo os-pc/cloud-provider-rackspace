@@ -18,7 +18,7 @@ fmt:
 	gofmt -s -w $(GOFMT_FILES)
 
 test: fmtcheck
-	go test $(TEST)
+	go test $(GOTEST)
 
 build: fmtcheck
 	GCO_ENABLED=0 GOOS=linux go build \
