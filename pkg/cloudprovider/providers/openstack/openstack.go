@@ -49,6 +49,7 @@ import (
 
 	v1helper "github.com/os-pc/cloud-provider-rackspace/pkg/apis/core/v1/helper"
 	"github.com/os-pc/cloud-provider-rackspace/pkg/util/metadata"
+	"github.com/os-pc/cloud-provider-rackspace/pkg/util/raxauth"
 	"github.com/os-pc/cloud-provider-rackspace/pkg/version"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -170,6 +171,7 @@ type AuthOpts struct {
 	UserID           string `gcfg:"user-id" mapstructure:"user-id" name:"os-userID" value:"optional" dependsOn:"os-password"`
 	Username         string `name:"os-userName" value:"optional" dependsOn:"os-password"`
 	Password         string `name:"os-password" value:"optional" dependsOn:"os-domainID|os-domainName,os-projectID|os-projectName,os-userID|os-userName"`
+	ApiKey           string `gcfg:"rax-api-key" mapstructure:"rax-api-key" name:"rax-api-key" value:"optional" dependsOn:"os-username"`
 	TenantID         string `gcfg:"tenant-id" mapstructure:"project-id" name:"os-projectID" value:"optional" dependsOn:"os-password"`
 	TenantName       string `gcfg:"tenant-name" mapstructure:"project-name" name:"os-projectName" value:"optional" dependsOn:"os-password"`
 	TrustID          string `gcfg:"trust-id" mapstructure:"trust-id" name:"os-trustID" value:"optional"`
@@ -277,40 +279,16 @@ func init() {
 	})
 }
 
-func (cfg AuthOpts) ToAuthOptions() gophercloud.AuthOptions {
-	opts := clientconfig.ClientOpts{
-		// this is needed to disable the clientconfig.AuthOptions func env detection
-		EnvPrefix: "_",
-		Cloud:     cfg.Cloud,
-		AuthInfo: &clientconfig.AuthInfo{
-			AuthURL:                     cfg.AuthURL,
-			UserID:                      cfg.UserID,
-			Username:                    cfg.Username,
-			Password:                    cfg.Password,
-			ProjectID:                   cfg.TenantID,
-			ProjectName:                 cfg.TenantName,
-			DomainID:                    cfg.DomainID,
-			DomainName:                  cfg.DomainName,
-			ProjectDomainID:             cfg.TenantDomainID,
-			ProjectDomainName:           cfg.TenantDomainName,
-			UserDomainID:                cfg.UserDomainID,
-			UserDomainName:              cfg.UserDomainName,
-			ApplicationCredentialID:     cfg.ApplicationCredentialID,
-			ApplicationCredentialName:   cfg.ApplicationCredentialName,
-			ApplicationCredentialSecret: cfg.ApplicationCredentialSecret,
-		},
+func (cfg AuthOpts) ToAuthOptions() raxauth.AuthOptions {
+	return raxauth.AuthOptions{
+		IdentityEndpoint: cfg.AuthURL,
+		Username:         cfg.Username,
+		Password:         cfg.Password,
+		ApiKey:           cfg.ApiKey,
+		TenantID:         cfg.TenantID,
+		// Persistent service, so we need to be able to renew tokens.
+		AllowReauth: true,
 	}
-
-	ao, err := clientconfig.AuthOptions(&opts)
-	if err != nil {
-		klog.V(1).Infof("Error parsing auth: %s", err)
-		return gophercloud.AuthOptions{}
-	}
-
-	// Persistent service, so we need to be able to renew tokens.
-	ao.AllowReauth = true
-
-	return *ao
 }
 
 // ReadConfig reads values from the cloud.conf
@@ -479,7 +457,10 @@ func NewOpenStackClient(cfg *AuthOpts, userAgent string, extraUserAgent ...strin
 	}
 
 	opts := cfg.ToAuthOptions()
-	err = openstack.Authenticate(provider, opts)
+	err = raxauth.Authenticate(provider, opts, gophercloud.EndpointOpts{})
+	if err != nil {
+		err = fmt.Errorf("failed to auth: %v", err)
+	}
 
 	return provider, err
 }
