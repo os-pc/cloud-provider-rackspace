@@ -40,6 +40,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	tokens2 "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/client"
 	"github.com/gophercloud/utils/openstack/clientconfig"
@@ -279,15 +280,17 @@ func init() {
 	})
 }
 
-func (cfg AuthOpts) ToAuthOptions() raxauth.AuthOptions {
-	return raxauth.AuthOptions{
-		IdentityEndpoint: cfg.AuthURL,
-		Username:         cfg.Username,
-		Password:         cfg.Password,
-		ApiKey:           cfg.ApiKey,
-		TenantID:         cfg.TenantID,
-		// Persistent service, so we need to be able to renew tokens.
-		AllowReauth: true,
+func (cfg AuthOpts) ToAuthOptions() raxauth.AuthOptionsRax {
+	return raxauth.AuthOptionsRax{
+		AuthOptions: tokens2.AuthOptions{
+			IdentityEndpoint: cfg.AuthURL,
+			Username:         cfg.Username,
+			Password:         cfg.Password,
+			TenantID:         cfg.TenantID,
+			// Persistent service, so we need to be able to renew tokens.
+			AllowReauth: true,
+		},
+		ApiKey: cfg.ApiKey,
 	}
 }
 
@@ -457,7 +460,7 @@ func NewOpenStackClient(cfg *AuthOpts, userAgent string, extraUserAgent ...strin
 	}
 
 	opts := cfg.ToAuthOptions()
-	err = raxauth.Authenticate(provider, opts, gophercloud.EndpointOpts{})
+	err = openstack.AuthenticateV2Ext(provider, &opts, gophercloud.EndpointOpts{})
 	if err != nil {
 		err = fmt.Errorf("failed to auth: %v", err)
 	}
