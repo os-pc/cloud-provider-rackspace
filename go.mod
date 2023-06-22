@@ -54,3 +54,5 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.18.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.0
 )
+
+replace github.com/gophercloud/gophercloud v1.4.0 => github.com/cardoe/gophercloud v0.12.1-0.20230622192811-3a9395130c0b
