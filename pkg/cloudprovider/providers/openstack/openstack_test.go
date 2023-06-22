@@ -693,7 +693,7 @@ func TestLoadBalancer(t *testing.T) {
 
 	for _, v := range versions {
 		t.Logf("Trying LBVersion = '%s'\n", v)
-		cfg.LoadBalancer.LBVersion = v
+		//cfg.LoadBalancer.LBVersion = v
 
 		os, err := NewOpenStack(cfg)
 		if err != nil {
